@@ -1,0 +1,280 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<!--
+  Copyright (C) 2017 Christopher R. Field.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<!--
+  Please do not remove these pre-processor If-Else blocks. These are used with
+  the `cargo wix` subcommand to automatically determine the installation
+  destination for 32-bit versus 64-bit installers. Removal of these lines will
+  cause installation errors.
+-->
+<?if $(var.Platform) = x64 ?>
+    <?define Win64 = "yes" ?>
+    <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+<?else ?>
+  <?define Win64 = "no" ?>
+  <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+<?endif ?>
+
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+
+    <Product
+        Id='*'
+        Name='World of Warships Replay Uploader'
+        UpgradeCode='C37BDB6A-22A3-4C27-9C61-B2A3B0AD56A7'
+        Manufacturer='Lane Kolbly'
+        Language='1033'
+        Codepage='1252'
+        Version='$(var.Version)'>
+
+        <Package Id='*'
+            Keywords='Installer'
+            Manufacturer='Lane Kolbly'
+            InstallerVersion='450'
+            Languages='1033'
+            Compressed='yes'
+            InstallScope='perMachine'
+            SummaryCodepage='1252'
+            Platform='$(var.Platform)'/>
+
+        <MajorUpgrade
+            Schedule='afterInstallInitialize'
+            DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
+
+        <Media Id='1' Cabinet='media1.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1'/>
+        <Property Id='DiskPrompt' Value='Poller Install Directory'/>
+
+        <InstallExecuteSequence>
+            <ScheduleReboot After="InstallFinalize"/>
+        </InstallExecuteSequence>
+
+        <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
+                <Directory Id='STEAM' Name='Steam'>
+                    <Directory Id='STEAMAPPS' Name='steamapps'>
+                        <Directory Id='STEAM_COMMON' Name='common'>
+                            <Directory Id='STEAM_DIR' Name='World of Warships'>
+                            </Directory>
+                        </Directory>
+                    </Directory>
+                </Directory>
+                <Directory Id='APPLICATIONFOLDER' Name='warships_replay_poller'>
+                    
+                    <!--
+                      Enabling the license sidecar file in the installer is a four step process:
+
+                      1. Uncomment the `Component` tag and its contents.
+                      2. Change the value for the `Source` attribute in the `File` tag to a path
+                         to the file that should be included as the license sidecar file. The path
+                         can, and probably should be, relative to this file.
+                      3. Change the value for the `Name` attribute in the `File` tag to the
+                         desired name for the file when it is installed alongside the `bin` folder
+                         in the installation directory. This can be omitted if the desired name is
+                         the same as the file name.
+                      4. Uncomment the `ComponentRef` tag with the Id attribute value of "License"
+                         further down in this file.
+                    -->
+                    <!--
+                    <Component Id='License' Guid='*' Win64='$(var.Win64)'>
+                        <File Id='LicenseFile' Name='ChangeMe' DiskId='1' Source='C:\Path\To\File' KeyPath='yes'/>
+                    </Component>
+                    -->
+
+                    <Directory Id='Bin' Name='bin'>
+                        <!--<Component Id='Path' Guid='C05EE3EE-7FF2-42E7-9BDC-6B89129AA065' Win64='$(var.Win64)' KeyPath='yes'>
+                            <Environment
+                                Id='PATH'
+                                Name='PATH'
+                                Value='[Bin]'
+                                Permanent='no'
+                                Part='last'
+                                Action='set'
+                                System='yes'/>
+                        </Component>-->
+                        <Component Id="RegistryEntries" Guid="5ad16def-54eb-4924-8fbf-d88830e2958a">
+                            <RegistryKey Root="HKLM"
+                                        Key="Software\PillowComputing\WorldOfWarshipsReplayUploader"
+                                  Action="createAndRemoveOnUninstall">
+                                <RegistryValue Type="integer" Name="SomeIntegerValue" Value="1" KeyPath="yes"/>
+                                <RegistryValue Type="string" Name="ReplayPath" Value="[STEAM_DIR]\replays"/>
+                                <RegistryValue Type="string" Name="UploadServerBase" Value="https://pillow.rscheme.org/warships-replay-uploader"/>
+                            </RegistryKey>
+                        </Component>
+
+                        <Component Id='binary0' Guid='*' Win64='$(var.Win64)'>
+                            <File
+                                Id='exe0'
+                                Name='warships_replay_poller.exe'
+                                DiskId='1'
+                                Source='target\$(var.Profile)\service.exe'
+                                KeyPath='yes'/>
+                            <ServiceInstall
+                                Name="warships_replay_poller"
+                                Start="auto"
+                                Type="ownProcess"
+                                ErrorControl="ignore">
+                            </ServiceInstall>
+                        </Component>
+                        <Component Id='binary1' Guid='*' Win64='$(var.Win64)'>
+                            <File
+                                Id='exe1'
+                                Name='upload_replays.exe'
+                                DiskId='1'
+                                Source='target\$(var.Profile)\uploader.exe'
+                                KeyPath='yes'/>
+                        </Component>
+                    </Directory>
+                </Directory>
+            </Directory>
+        </Directory>
+
+        <Feature
+            Id='Binaries'
+            Title='Application'
+            Description='Installs all binaries and the license.'
+            Level='1'
+            ConfigurableDirectory='APPLICATIONFOLDER'
+            AllowAdvertise='no'
+            Display='expand'
+            Absent='disallow'>
+            
+            <!--
+              Uncomment the following `ComponentRef` tag to add the license
+              sidecar file to the installer.
+            -->
+            <!--<ComponentRef Id='License'/>-->
+
+            <ComponentRef Id='binary0'/>
+            <ComponentRef Id='binary1'/>
+            <ComponentRef Id='RegistryEntries'/>
+
+            <!-- No need for adding it to the PATH if it's a service -->
+            <!--<Feature
+                Id='Environment'
+                Title='PATH Environment Variable'
+                Description='Add the install location of the [ProductName] executable to the PATH system environment variable. This allows the [ProductName] executable to be called from any location.'
+                Level='1'
+                Absent='allow'>
+                <ComponentRef Id='Path'/>
+            </Feature>-->
+        </Feature>
+
+        <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
+
+        
+        <!--
+          Uncomment the following `Icon` and `Property` tags to change the product icon.
+
+          The product icon is the graphic that appears in the Add/Remove
+          Programs control panel for the application.
+        -->
+        <!--<Icon Id='ProductICO' SourceFile='wix\Product.ico'/>-->
+        <!--<Property Id='ARPPRODUCTICON' Value='ProductICO' />-->
+
+
+        <!--
+          Adding a URL to Add/Remove Programs control panel listing for the
+          application is a two step process:
+
+          1. Uncomment the following `Property` tag with the "ARPHELPLINK" Id
+             attribute value.
+          2. Change the value for `Value` attribute of the following
+             `Property` tag to a valid URL.
+        -->
+        <!--<Property Id='ARPHELPLINK' Value='ChangeMe'/>-->
+
+        <UI>
+            <UIRef Id='WixUI_FeatureTree'/>
+            
+            <!--
+              Enabling the EULA dialog in the installer is a three step process:
+
+                1. Comment out or remove the two `Publish` tags that follow the
+                   `WixVariable` tag.
+                2. Uncomment the `<WixVariable Id='WixUILicenseRtf' Value='Path\to\Eula.rft'>` tag futher down
+                3. Replace the `Value` attribute of the `WixVariable` tag with
+                   the path to a RTF file that will be used as the EULA and
+                   displayed in the license agreement dialog.
+            -->
+            <Publish Dialog='WelcomeDlg' Control='Next' Event='NewDialog' Value='CustomizeDlg' Order='99'>1</Publish>
+            <Publish Dialog='CustomizeDlg' Control='Back' Event='NewDialog' Value='WelcomeDlg' Order='99'>1</Publish>
+            <Publish Dialog='CustomizeDlg' Control='Next' Event='NewDialog' Value='InstallDlg' Order='99'>1</Publish>
+
+            <TextStyle Id="DlgTitleFont" FaceName="Tahoma" Size="8" Bold="yes" />
+            <Dialog Id="InstallDlg" Width="370" Height="270" Title="[ProductName] Setup" NoMinimize="yes">
+              <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" TabSkip="no">
+                <Text>{\DlgTitleFont}Select your World of Warships directory</Text>
+              </Control>
+
+              <Control Id="SteamDirectory" Type="PathEdit" X="21" Y="30" Width="300" Height="17"
+                  Text="World of Warships install directory" Property="STEAM_DIR">
+              </Control>
+              <Control Id="btnDirBrowse" Type="PushButton" Width="56" Height="17" X="21" Y="50" Text="Browse..." >
+                <Publish Property="_BrowseProperty" Value="STEAM_DIR" Order="1">1</Publish>
+                <Publish Event="SpawnDialog" Value="BrowseDlg" Order="2">1</Publish>
+              </Control>
+
+              <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17"
+                  Text="Back">
+                  <Publish Event="NewDialog" Value="CustomizeDlg" />
+              </Control>
+              <Control Id="Install" Type="PushButton" X="240" Y="243" Width="56" Height="17"
+                  Default="yes" Text="Install">
+                  <Publish Event="EndDialog" Value="Return" />
+              </Control>
+              <Control Id="Cancel" Type="PushButton" X="300" Y="243" Width="56" Height="17"
+                  Cancel="yes" Text="Cancel">
+                    <!--<Publish Event="Reset" Value="0">1</Publish>-->
+                    <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+                </Control>
+            </Dialog>
+
+        </UI>
+
+        
+        <!--
+          Enabling the EULA dialog in the installer requires uncommenting
+          the following `WixUILicenseRTF` tag and changing the `Value`
+          attribute.
+        -->
+        <!-- <WixVariable Id='WixUILicenseRtf' Value='Relative\Path\to\Eula.rtf'/> -->
+
+        
+        <!--
+          Uncomment the next `WixVaraible` tag to customize the installer's
+          Graphical User Interface (GUI) and add a custom banner image across
+          the top of each screen. See the WiX Toolset documentation for details
+          about customization.
+
+          The banner BMP dimensions are 493 x 58 pixels.
+        -->
+        <!--<WixVariable Id='WixUIBannerBmp' Value='wix\Banner.bmp'/>-->
+
+        
+        <!--
+          Uncomment the next `WixVariable` tag to customize the installer's
+          Graphical User Interface (GUI) and add a custom image to the first
+          dialog, or screen. See the WiX Toolset documentation for details about
+          customization.
+
+          The dialog BMP dimensions are 493 x 312 pixels.
+        -->
+        <!--<WixVariable Id='WixUIDialogBmp' Value='wix\Dialog.bmp'/>-->
+
+    </Product>
+
+
+</Wix>

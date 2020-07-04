@@ -1,0 +1,24 @@
+[package]
+name = "warships_replay_poller"
+version = "0.1.0"
+authors = ["Lane Kolbly <lane@rscheme.org>"]
+edition = "2018"
+default-run = "uploader"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+windows-service = "0.3.0"
+thiserror = "1.0.20"
+sha2 = "0.9.1"
+hex = "0.4.2"
+warp = "0.2.3"
+serde = "1.0"
+serde_json = "1.0"
+serde_derive = "1.0"
+pretty_env_logger = "0.4"
+tokio = { version = "0.2", features = ["macros"] }
+bytes = "0.5.5"
+reqwest = { version = "0.10.6", features = ["blocking", "json"] }
+log = "0.4.8"
+winreg = "0.7"
